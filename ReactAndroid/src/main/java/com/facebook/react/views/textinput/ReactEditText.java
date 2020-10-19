@@ -33,6 +33,7 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.widget.AppCompatEditText;
 import androidx.core.view.AccessibilityDelegateCompat;
 import androidx.core.view.ViewCompat;
@@ -113,10 +114,10 @@ public class ReactEditText extends AppCompatEditText {
 
     mReactBackgroundManager = new ReactViewBackgroundManager(this);
     mInputMethodManager =
-        (InputMethodManager)
-            Assertions.assertNotNull(context.getSystemService(Context.INPUT_METHOD_SERVICE));
+      (InputMethodManager)
+        Assertions.assertNotNull(context.getSystemService(Context.INPUT_METHOD_SERVICE));
     mDefaultGravityHorizontal =
-        getGravity() & (Gravity.HORIZONTAL_GRAVITY_MASK | Gravity.RELATIVE_HORIZONTAL_GRAVITY_MASK);
+      getGravity() & (Gravity.HORIZONTAL_GRAVITY_MASK | Gravity.RELATIVE_HORIZONTAL_GRAVITY_MASK);
     mDefaultGravityVertical = getGravity() & Gravity.VERTICAL_GRAVITY_MASK;
     mNativeEventCount = 0;
     mIsSettingTextFromJS = false;
@@ -134,21 +135,22 @@ public class ReactEditText extends AppCompatEditText {
     // Turn off hardware acceleration for Oreo (T40484798)
     // see https://issuetracker.google.com/issues/67102093
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
-        && Build.VERSION.SDK_INT <= Build.VERSION_CODES.O_MR1) {
+      && Build.VERSION.SDK_INT <= Build.VERSION_CODES.O_MR1) {
       setLayerType(View.LAYER_TYPE_SOFTWARE, null);
     }
 
     ViewCompat.setAccessibilityDelegate(
-        this,
-        new AccessibilityDelegateCompat() {
-          @Override
-          public boolean performAccessibilityAction(View host, int action, Bundle args) {
-            if (action == AccessibilityNodeInfo.ACTION_CLICK) {
-              return requestFocusInternal();
-            }
-            return super.performAccessibilityAction(host, action, args);
+      this,
+      new AccessibilityDelegateCompat() {
+        @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+        @Override
+        public boolean performAccessibilityAction(View host, int action, Bundle args) {
+          if (action == AccessibilityNodeInfo.ACTION_CLICK) {
+            return requestFocusInternal();
           }
-        });
+          return super.performAccessibilityAction(host, action, args);
+        }
+      });
   }
 
   // After the text changes inside an EditText, TextView checks if a layout() has been requested.
@@ -179,9 +181,9 @@ public class ReactEditText extends AppCompatEditText {
       case MotionEvent.ACTION_MOVE:
         if (mDetectScrollMovement) {
           if (!canScrollVertically(-1)
-              && !canScrollVertically(1)
-              && !canScrollHorizontally(-1)
-              && !canScrollHorizontally(1)) {
+            && !canScrollVertically(1)
+            && !canScrollHorizontally(-1)
+            && !canScrollHorizontally(1)) {
             // We cannot scroll, let parent views take care of these touches.
             this.getParent().requestDisallowInterceptTouchEvent(false);
           }
@@ -218,7 +220,7 @@ public class ReactEditText extends AppCompatEditText {
     InputConnection inputConnection = super.onCreateInputConnection(outAttrs);
     if (inputConnection != null && mOnKeyPress) {
       inputConnection =
-          new ReactEditTextInputConnectionWrapper(inputConnection, reactContext, this);
+        new ReactEditTextInputConnectionWrapper(inputConnection, reactContext, this);
     }
 
     if (isMultiline() && getBlurOnSubmit()) {
@@ -244,6 +246,7 @@ public class ReactEditText extends AppCompatEditText {
     return isFocused();
   }
 
+  @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
   private boolean requestFocusInternal() {
     setFocusableInTouchMode(true);
     // We must explicitly call this method on the super class; if we call requestFocus() without
@@ -382,25 +385,23 @@ public class ReactEditText extends AppCompatEditText {
 
   @Override
   public void setInputType(int type) {
+
     Typeface tf = super.getTypeface();
+    super.setInputType(type);
+    mStagedInputType = type;
     // Input type password defaults to monospace font, so we need to re-apply the font
     super.setTypeface(tf);
-
-    int inputType = type;
 
     // Set InputType to TYPE_CLASS_TEXT (the default one for Android) to fix a crash on Xiaomi
     // devices with Android Q. This crash happens when focusing on a email EditText within a
     // ScrollView, a prompt will be triggered but the system fail to locate it properly.
     // Here is an example post discussing about this issue:
     // https://github.com/facebook/react-native/issues/27204
-    if (inputType == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
-        && Build.VERSION.SDK_INT == Build.VERSION_CODES.Q
-        && Build.MANUFACTURER.startsWith("Xiaomi")) {
-      inputType = InputType.TYPE_CLASS_TEXT;
+    if (type == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+      && Build.VERSION.SDK_INT == Build.VERSION_CODES.Q
+      && Build.MANUFACTURER.startsWith("Xiaomi")) {
+      type = InputType.TYPE_CLASS_TEXT;
     }
-
-    super.setInputType(inputType);
-    mStagedInputType = inputType;
 
     /**
      * If set forces multiline on input, because of a restriction on Android source that enables
@@ -415,7 +416,7 @@ public class ReactEditText extends AppCompatEditText {
     // We override the KeyListener so that all keys on the soft input keyboard as well as hardware
     // keyboards work. Some KeyListeners like DigitsKeyListener will display the keyboard but not
     // accept all input from it
-    mKeyListener.setInputType(inputType);
+    mKeyListener.setInputType(type);
     setKeyListener(mKeyListener);
   }
 
@@ -448,12 +449,13 @@ public class ReactEditText extends AppCompatEditText {
     mTypefaceDirty = false;
 
     Typeface newTypeface =
-        ReactTypefaceUtils.applyStyles(
-            getTypeface(), mFontStyle, mFontWeight, mFontFamily, getContext().getAssets());
+      ReactTypefaceUtils.applyStyles(
+        getTypeface(), mFontStyle, mFontWeight, mFontFamily, getContext().getAssets());
     setTypeface(newTypeface);
   }
 
   // VisibleForTesting from {@link TextInputEventsTestCase}.
+  @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
   public void requestFocusFromJS() {
     requestFocusInternal();
   }
@@ -503,7 +505,7 @@ public class ReactEditText extends AppCompatEditText {
     // reset some of these spans even if they are set directly, SpannableStringBuilder#replace() is
     // used instead (this is also used by the keyboard implementation underneath the covers).
     SpannableStringBuilder spannableStringBuilder =
-        new SpannableStringBuilder(reactTextUpdate.getText());
+      new SpannableStringBuilder(reactTextUpdate.getText());
     manageSpans(spannableStringBuilder);
     mContainsImages = reactTextUpdate.containsImages();
 
@@ -546,7 +548,7 @@ public class ReactEditText extends AppCompatEditText {
       }
 
       if ((getText().getSpanFlags(spans[spanIdx]) & Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-          != Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) {
+        != Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) {
         continue;
       }
       Object span = spans[spanIdx];
@@ -564,10 +566,10 @@ public class ReactEditText extends AppCompatEditText {
   }
 
   private static boolean sameTextForSpan(
-      final Editable oldText,
-      final SpannableStringBuilder newText,
-      final int start,
-      final int end) {
+    final Editable oldText,
+    final SpannableStringBuilder newText,
+    final int start,
+    final int end) {
     if (start > newText.length() || end > newText.length()) {
       return false;
     }
@@ -600,8 +602,8 @@ public class ReactEditText extends AppCompatEditText {
 
   private boolean isSecureText() {
     return (getInputType()
-            & (InputType.TYPE_NUMBER_VARIATION_PASSWORD | InputType.TYPE_TEXT_VARIATION_PASSWORD))
-        != 0;
+      & (InputType.TYPE_NUMBER_VARIATION_PASSWORD | InputType.TYPE_TEXT_VARIATION_PASSWORD))
+      != 0;
   }
 
   private void onContentSizeChange() {
@@ -632,10 +634,10 @@ public class ReactEditText extends AppCompatEditText {
       gravityHorizontal = mDefaultGravityHorizontal;
     }
     setGravity(
-        (getGravity()
-                & ~Gravity.HORIZONTAL_GRAVITY_MASK
-                & ~Gravity.RELATIVE_HORIZONTAL_GRAVITY_MASK)
-            | gravityHorizontal);
+      (getGravity()
+        & ~Gravity.HORIZONTAL_GRAVITY_MASK
+        & ~Gravity.RELATIVE_HORIZONTAL_GRAVITY_MASK)
+        | gravityHorizontal);
   }
 
   /* package */ void setGravityVertical(int gravityVertical) {
@@ -733,6 +735,7 @@ public class ReactEditText extends AppCompatEditText {
     }
   }
 
+  @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
   @Override
   public void onAttachedToWindow() {
     super.onAttachedToWindow();
